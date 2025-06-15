@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #d1d5db;
+        }
+        .trading-card {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-secondary {
+            background-color: #4b5563;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #374151;
+        }
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #3b82f6;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            width: 90%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Trading Companion</h1>
+            <p class="text-gray-400">Your personal dashboard for disciplined trading, now with live data & AI analysis.</p>
+            <div class="mt-4 trading-card p-4 rounded-lg">
+                <label for="apiKeyInput" class="block text-sm font-medium text-gray-300">FinancialModelingPrep API Key</label>
+                <div class="flex items-center space-x-2 mt-1">
+                    <input type="password" id="apiKeyInput" class="bg-gray-800 border-gray-600 rounded-md shadow-sm p-2 text-sm w-full max-w-xs" placeholder="Enter your API Key">
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Required for live data. Get a free key from <a href="https://site.financialmodelingprep.com/developer" target="_blank" class="text-blue-400 hover:underline">FinancialModelingPrep</a>.</p>
+            </div>
+        </header>
+
+        <main>
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-700">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button onclick="changeTab('analysis')" class="tab tab-active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Analysis & Plan</button>
+                    <button onclick="changeTab('log')" class="tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500">Trade Log</button>
+                    <button onclick="changeTab('dashboard')" class="tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500">Performance Dashboard</button>
+                </nav>
+            </div>
+
+            <!-- Analysis & Plan Tab -->
+            <div id="analysis" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <!-- Left side: Chart -->
+                    <div class="lg:col-span-3 trading-card p-4 rounded-lg">
+                        <div class="flex flex-wrap items-center justify-between mb-4 gap-4">
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="instrumentInput" class="bg-gray-800 border-gray-600 rounded-md shadow-sm p-2 text-sm w-28" value="EURUSD" placeholder="e.g., EURUSD, ^GSPC">
+                                <button onclick="loadChartData()" class="btn-primary px-4 py-2 text-sm rounded-md">Load Chart</button>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm">Timeframe:</span>
+                                <button onclick="updateTimeframe('1D')" class="timeframe-btn bg-gray-600 px-3 py-1 rounded-md text-xs font-medium">1D</button>
+                                <button onclick="updateTimeframe('4H')" class="timeframe-btn bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-md text-xs font-medium">4H</button>
+                                <button onclick="updateTimeframe('1H')" class="timeframe-btn bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-md text-xs font-medium">1H</button>
+                            </div>
+                        </div>
+                        <div id="chart"></div>
+                         <div id="chartMessage" class="text-center text-gray-400 py-4">Enter a Forex pair (e.g., EURUSD) or Index (e.g., ^GSPC) and click "Load Chart".</div>
+                    </div>
+
+                    <!-- Right side: AI Analysis and Trade Plan -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- AI Analysis Card -->
+                        <div class="trading-card p-4 rounded-lg">
+                            <h2 class="text-xl font-semibold text-white mb-4">AI-Powered Analysis</h2>
+                            <button id="generateAnalysisBtn" onclick="generateAnalysis()" class="w-full btn-secondary font-bold py-2 px-4 rounded-md mb-4 flex items-center justify-center space-x-2"><span>Generate Analysis</span></button>
+                            <div id="analysisResultWrapper" class="bg-gray-800 p-3 rounded-md">
+                                <div id="analysisSpinner" class="hidden spinner mx-auto"></div>
+                                <div id="analysisResult" class="text-sm text-gray-300">
+                                    Load a chart to enable AI analysis.
+                                </div>
+                            </div>
+                            <div id="aiPlanActions" class="hidden mt-4 space-y-2">
+                                <button id="draftPlanBtn" onclick="draftTradePlan()" class="w-full btn-secondary font-bold py-2 px-4 rounded-md flex items-center justify-center space-x-2">✨ <span>Draft Trade Plan from Analysis</span></button>
+                                <div id="planResultWrapper" class="hidden bg-gray-800 p-3 rounded-md">
+                                    <div id="planSpinner" class="hidden spinner mx-auto"></div>
+                                    <div id="planResult" class="text-sm text-gray-300"></div>
+                                </div>
+                                <button id="applyPlanBtn" onclick="applyPlanToForm()" class="hidden w-full btn-primary font-bold py-2 px-4 rounded-md">Apply to Form</button>
+                            </div>
+                        </div>
+
+                        <!-- Trade Plan Card -->
+                        <div class="trading-card p-4 rounded-lg">
+                            <h2 class="text-xl font-semibold text-white mb-4">Create Trade Plan</h2>
+                            <form id="tradePlanForm">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label for="instrument" class="block text-sm font-medium text-gray-300">Instrument</label>
+                                        <input type="text" id="instrumentFormInput" class="mt-1 block w-full bg-gray-800 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2" required>
+                                    </div>
+                                    <div>
+                                        <label for="strategy" class="block text-sm font-medium text-gray-300">Strategy/Setup</label>
+                                        <input type="text" id="strategy" class="mt-1 block w-full bg-gray-800 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2" placeholder="e.g., Breakout, Trend-following">
+                                    </div>
+                                    <div>
+                                        <label for="entryPrice" class="block text-sm font-medium text-gray-300">Potential Entry Price</label>
+                                        <input type="number" step="any" id="entryPrice" class="mt-1 block w-full bg-gray-800 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2" required>
+                                    </div>
+                                    <div>
+                                        <label for="stopLoss" class="block text-sm font-medium text-gray-300">Stop Loss</label>
+                                        <input type="number" step="any" id="stopLoss" class="mt-1 block w-full bg-gray-800 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2" required>
+                                    </div>
+                                    <div>
+                                        <label for="takeProfit" class="block text-sm font-medium text-gray-300">Take Profit</label>
+                                        <input type="number" step="any" id="takeProfit" class="mt-1 block w-full bg-gray-800 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2" required>
+                                    </div>
+                                    <button type="submit" class="w-full btn-primary font-bold py-2 px-4 rounded-md">Log This Trade</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Log Tab -->
+            <div id="log" class="tab-content hidden">
+                <div class="trading-card p-4 rounded-lg">
+                    <h2 class="text-xl font-semibold text-white mb-4">Trade History</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-800">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Instrument</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Strategy</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Entry</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Stop Loss</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Take Profit</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Outcome (P/L)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">R:R Ratio</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradeLogBody" class="bg-gray-900 divide-y divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content hidden">
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2 trading-card p-4 rounded-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">Asset Curve</h2>
+                        <div id="assetCurveChart"></div>
+                    </div>
+                    <div class="trading-card p-4 rounded-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">Key Metrics</h2>
+                        <div class="space-y-4">
+                            <div><p class="text-sm text-gray-400">Total Trades</p><p id="totalTrades" class="text-2xl font-semibold text-white">0</p></div>
+                            <div><p class="text-sm text-gray-400">Win Rate</p><p id="winRate" class="text-2xl font-semibold text-white">N/A</p></div>
+                            <div><p class="text-sm text-gray-400">Average R:R Ratio</p><p id="avgRR" class="text-2xl font-semibold text-white">N/A</p></div>
+                            <div><p class="text-sm text-gray-400">Expectancy</p><p id="expectancy" class="text-2xl font-semibold text-white">N/A</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Reflection Modal -->
+    <div id="reflectionModal" class="modal-overlay hidden">
+        <div class="modal-content rounded-lg shadow-xl">
+            <div class="p-4 border-b border-gray-600 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-white">✨ AI Trade Reflection</h3>
+                <button onclick="closeReflectionModal()" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-4 min-h-[200px]"><div id="reflectionSpinner" class="hidden spinner mx-auto"></div><div id="reflectionResult" class="text-sm text-gray-300"></div></div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- State Management ---
+        let trades = [];
+        let chart;
+        let assetCurveChart;
+        let currentBalance = 10000;
+        let activeTimeframe = '1D';
+        let activeInstrument = 'EURUSD';
+        let currentChartData = [];
+        let latestAnalysis = '';
+        let latestPlan = null;
+
+        // --- Tab Switching Logic ---
+        function changeTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.remove('tab-active', 'text-blue-400');
+                t.classList.add('text-gray-400', 'hover:text-gray-200', 'hover:border-gray-500');
+                });
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            const activeTab = document.querySelector(`button[onclick="changeTab('${tabName}')"]`);
+            activeTab.classList.add('tab-active', 'text-blue-400');
+            activeTab.classList.remove('text-gray-400');
+            document.getElementById(tabName).classList.remove('hidden');
+            if (tabName === 'dashboard') {
+                renderAssetCurveChart();
+                updateDashboardMetrics();
+            }
+        }
+
+        // --- Charting Logic ---
+        const chartOptions = {
+            chart: { type: 'candlestick', height: 450, toolbar: { show: true }, zoom: { enabled: true } },
+            title: { text: '', align: 'left', style: { color: '#d1d5db' } },
+            xaxis: { type: 'datetime', labels: { style: { colors: '#d1d5db' } } },
+            yaxis: { tooltip: { enabled: true }, labels: { formatter: (value) => { return value.toFixed(4) }, style: { colors: '#d1d5db' } } },
+            series: [],
+            grid: { borderColor: '#374151' },
+            tooltip: { theme: 'dark' }
+        };
+
+        async function fetchFinancialData() {
+            const FMP_API_KEY = document.getElementById('apiKeyInput').value;
+            if (!FMP_API_KEY) {
+                document.getElementById('chartMessage').classList.remove('hidden');
+                document.getElementById('chartMessage').innerText = 'Please enter your FinancialModelingPrep API Key above to load chart data.';
+                return;
+            }
+            
+            const instrument = document.getElementById('instrumentInput').value.toUpperCase();
+            if (!instrument) {
+                document.getElementById('chartMessage').innerText = 'Please enter an instrument symbol.';
+                return;
+            }
+            activeInstrument = instrument;
+            
+            let url;
+            let timeSegment;
+
+            if (activeTimeframe === '1D') {
+                timeSegment = 'historical-price-full';
+            } else {
+                timeSegment = `historical-chart/${activeTimeframe.toLowerCase()}`;
+            }
+
+            url = `https://financialmodelingprep.com/api/v3/${timeSegment}/${instrument}?apikey=${FMP_API_KEY}`;
+            
+            document.getElementById('chartMessage').classList.remove('hidden');
+            document.getElementById('chartMessage').innerText = `Fetching ${instrument} data...`;
+            currentChartData = [];
+            chart?.updateOptions({ series: [] });
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (!response.ok || data["Error Message"]) {
+                    throw new Error(data["Error Message"] || `HTTP error! status: ${response.status}`);
+                }
+                
+                const historicalData = data.historical || data;
+
+                if (!historicalData || historicalData.length === 0) {
+                    throw new Error("No data returned. This can happen on weekends for intraday timeframes. Please check the symbol or try the '1D' timeframe.");
+                }
+                
+                localStorage.setItem('fmpApiKey', FMP_API_KEY);
+
+                const formattedData = historicalData.map(item => ({
+                    x: new Date(item.date),
+                    y: [item.open, item.high, item.low, item.close]
+                })).reverse();
+                
+                currentChartData = formattedData;
+                
+                document.getElementById('chartMessage').classList.add('hidden');
+                chart.updateOptions({
+                    title: { text: `${instrument} - ${activeTimeframe}` },
+                    series: [{ data: currentChartData }]
+                });
+
+            } catch (error) {
+                console.error("Chart data error:", error);
+                chart?.updateOptions({ series: [] });
+                document.getElementById('chartMessage').innerText = `Error: ${error.message}`;
+                document.getElementById('chartMessage').classList.remove('hidden');
+            }
+        }
+        
+        function loadChartData() {
+            document.getElementById('analysisResult').innerHTML = 'Load a chart to enable AI analysis.';
+            document.getElementById('aiPlanActions').classList.add('hidden');
+            fetchFinancialData();
+        }
+
+        function updateTimeframe(timeframe) {
+            activeTimeframe = timeframe;
+            document.querySelectorAll('.timeframe-btn').forEach(btn => {
+                btn.classList.remove('bg-gray-600');
+                btn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+            });
+            const activeBtn = document.querySelector(`button[onclick="updateTimeframe('${timeframe}')"]`);
+            activeBtn.classList.add('bg-gray-600');
+            activeBtn.classList.remove('bg-gray-700');
+            loadChartData();
+        }
+        
+        // --- AI Analysis & Planning Logic ---
+        async function generateAnalysis() {
+            const analysisResultDiv = document.getElementById('analysisResult');
+            const spinner = document.getElementById('analysisSpinner');
+            const generateBtn = document.getElementById('generateAnalysisBtn');
+            
+            if (currentChartData.length === 0) {
+                analysisResultDiv.innerText = 'Please load a chart with data before generating an analysis.';
+                return;
+            }
+
+            const aiPlanActions = document.getElementById('aiPlanActions');
+            aiPlanActions.classList.add('hidden');
+            analysisResultDiv.innerHTML = '';
+            spinner.classList.remove('hidden');
+            generateBtn.disabled = true;
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                const seriesData = currentChartData.slice(-50);
+                const priceDataString = seriesData.map(dp => `Date: ${new Date(dp.x).toLocaleDateString()}, Open: ${dp.y[0].toFixed(4)}, High: ${dp.y[1].toFixed(4)}, Low: ${dp.y[2].toFixed(4)}, Close: ${dp.y[3].toFixed(4)}`).join('\n');
+                const prompt = `As a professional trading analyst, review the following recent price action data for ${activeInstrument} on the ${activeTimeframe} timeframe. Price Data (OHLC):\n${priceDataString}\n\nBased on this data, provide a concise technical analysis summary. Structure your response with these sections: **Trend:**, **Key Support:**, **Key Resistance:**, and **Outlook:**.`;
+                
+                const resultText = await callGemini(prompt);
+                latestAnalysis = resultText;
+                analysisResultDiv.innerHTML = resultText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                aiPlanActions.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error generating analysis:", error);
+                analysisResultDiv.innerText = 'Failed to generate analysis. Please try again.';
+            } finally {
+                spinner.classList.add('hidden');
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        async function draftTradePlan() {
+            const planResultWrapper = document.getElementById('planResultWrapper'), planResultDiv = document.getElementById('planResult');
+            const spinner = document.getElementById('planSpinner'), draftBtn = document.getElementById('draftPlanBtn'), applyBtn = document.getElementById('applyPlanBtn');
+            
+            planResultWrapper.classList.remove('hidden');
+            planResultDiv.innerHTML = ''; spinner.classList.remove('hidden');
+            draftBtn.disabled = true; draftBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            applyBtn.classList.add('hidden');
+
+            try {
+                const lastDataPoint = currentChartData.slice(-1)[0];
+                const lastClose = lastDataPoint.y[3];
+                const prompt = `Based on the following technical analysis for ${activeInstrument} and the last closing price of ${lastClose.toFixed(4)}, create a specific, actionable trade plan. Analysis: "${latestAnalysis}". Propose one single trade plan (either long or short). Provide reasoning for your choice.`;
+                const schema = { type: "OBJECT", properties: { direction: { type: "STRING", enum: ["Long", "Short"] }, entry: { type: "NUMBER" }, stop_loss: { type: "NUMBER" }, take_profit: { type: "NUMBER" }, reasoning: { type: "STRING" } }, required: ["direction", "entry", "stop_loss", "take_profit", "reasoning"] };
+
+                const resultJson = await callGemini(prompt, schema);
+                latestPlan = JSON.parse(resultJson);
+
+                planResultDiv.innerHTML = `<strong>Direction:</strong> ${latestPlan.direction}<br><strong>Entry:</strong> ${latestPlan.entry.toFixed(4)}<br><strong>Stop-Loss:</strong> ${latestPlan.stop_loss.toFixed(4)}<br><strong>Take-Profit:</strong> ${latestPlan.take_profit.toFixed(4)}<br><strong>Reasoning:</strong> ${latestPlan.reasoning}`;
+                applyBtn.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error drafting plan:", error);
+                planResultDiv.innerText = 'Failed to draft a trade plan. Please try again.';
+            } finally {
+                spinner.classList.add('hidden');
+                draftBtn.disabled = false;
+                draftBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        
+        function applyPlanToForm() {
+            if (!latestPlan) return;
+            document.getElementById('instrumentFormInput').value = activeInstrument;
+            document.getElementById('strategy').value = `${latestPlan.direction} based on AI Analysis`;
+            document.getElementById('entryPrice').value = latestPlan.entry.toFixed(4);
+            document.getElementById('stopLoss').value = latestPlan.stop_loss.toFixed(4);
+            document.getElementById('takeProfit').value = latestPlan.take_profit.toFixed(4);
+        }
+
+        // --- Trade Logging with localStorage ---
+        function saveTradesToStorage() {
+            localStorage.setItem('tradingCompanionLog', JSON.stringify(trades));
+        }
+
+        function loadTradesFromStorage() {
+            const savedTrades = localStorage.getItem('tradingCompanionLog');
+            if (savedTrades) {
+                trades = JSON.parse(savedTrades).map(trade => {
+                    trade.date = new Date(trade.date); // Convert date string back to Date object
+                    return trade;
+                });
+            }
+        }
+
+        document.getElementById('tradePlanForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const trade = {
+                date: new Date(), instrument: document.getElementById('instrumentFormInput').value,
+                strategy: document.getElementById('strategy').value, entry: parseFloat(document.getElementById('entryPrice').value),
+                stopLoss: parseFloat(document.getElementById('stopLoss').value), takeProfit: parseFloat(document.getElementById('takeProfit').value),
+                outcome: (Math.random() > 0.5) ? 'Win' : 'Loss'
+            };
+            trade.pl = trade.outcome === 'Win' ? Math.abs(trade.takeProfit - trade.entry) : -Math.abs(trade.entry - trade.stopLoss);
+            const risk = Math.abs(trade.entry - trade.stopLoss);
+            trade.rr = risk > 0 ? (Math.abs(trade.takeProfit - trade.entry) / risk).toFixed(2) : 'N/A';
+            
+            trades.push(trade);
+            saveTradesToStorage();
+            addTradeToLog(trade, trades.length - 1);
+            updateDashboardMetrics();
+            renderAssetCurveChart();
+            this.reset();
+            changeTab('log');
+        });
+
+        function addTradeToLog(trade, index) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td class="px-6 py-4 whitespace-nowrap text-sm">${trade.date.toLocaleDateString()}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.instrument}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.strategy}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.entry.toFixed(4)}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.stopLoss.toFixed(4)}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.takeProfit.toFixed(4)}</td><td class="px-6 py-4 whitespace-nowrap text-sm ${trade.outcome === 'Win' ? 'text-green-400' : 'text-red-400'}">${trade.pl.toFixed(4)}</td><td class="px-6 py-4 whitespace-nowrap text-sm">${trade.rr}</td><td class="px-6 py-4 whitespace-nowrap text-sm"><button onclick="openReflectionModal(${index})" class="btn-secondary px-2 py-1 text-xs rounded">✨ Reflect</button></td>`;
+            document.getElementById('tradeLogBody').appendChild(row);
+        }
+
+        function populateTradeLogUI() {
+            const tradeLogBody = document.getElementById('tradeLogBody');
+            tradeLogBody.innerHTML = '';
+            trades.forEach((trade, index) => {
+                addTradeToLog(trade, index);
+            });
+        }
+
+        // --- AI Reflection Modal Logic ---
+        function openReflectionModal(index) { document.getElementById('reflectionModal').classList.remove('hidden'); generateReflection(index); }
+        function closeReflectionModal() { document.getElementById('reflectionModal').classList.add('hidden'); }
+
+        async function generateReflection(index) {
+            const resultDiv = document.getElementById('reflectionResult'), spinner = document.getElementById('reflectionSpinner');
+            resultDiv.innerHTML = ''; spinner.classList.remove('hidden');
+            try {
+                const trade = trades[index];
+                const prompt = `As a trading coach, reflect on the following completed trade. Details: Instrument: ${trade.instrument}, Strategy: "${trade.strategy}", Entry: ${trade.entry}, SL: ${trade.stopLoss}, TP: ${trade.takeProfit}, Outcome: A ${trade.outcome} with P/L of ${trade.pl.toFixed(4)}. Provide constructive feedback. Comment on the R:R setup. What could be learned? Be educational and encouraging.`;
+                const reflectionText = await callGemini(prompt);
+                resultDiv.innerHTML = reflectionText.replace(/\n/g, '<br>');
+            } catch (error) {
+                console.error("Error generating reflection:", error);
+                resultDiv.innerText = 'Failed to generate reflection. Please try again.';
+            } finally { spinner.classList.add('hidden'); }
+        }
+        
+        // --- Dashboard Logic ---
+        const assetCurveOptions = { chart: { type: 'area', height: 350, toolbar: { show: false } }, dataLabels: { enabled: false }, stroke: { curve: 'smooth' }, series: [], xaxis: { type: 'category', categories: [], labels: { style: { colors: '#d1d5db' } } }, yaxis: { labels: { style: { colors: '#d1d5db' } } }, grid: { borderColor: '#374151' }, tooltip: { theme: 'dark' } };
+        function renderAssetCurveChart() {
+            let balance = currentBalance; const assetData = [balance]; const categories = [0];
+            trades.forEach((trade, index) => { balance += trade.pl; assetData.push(balance); categories.push(index + 1); });
+            assetCurveOptions.series = [{ name: 'Balance', data: assetData }]; assetCurveOptions.xaxis.categories = categories;
+            if (assetCurveChart) { assetCurveChart.updateOptions(assetCurveOptions); } else { assetCurveChart = new ApexCharts(document.querySelector("#assetCurveChart"), assetCurveOptions); assetCurveChart.render(); }
+        }
+        function updateDashboardMetrics() {
+            const total = trades.length; document.getElementById('totalTrades').innerText = total;
+            if (total === 0) { ['winRate', 'avgRR', 'expectancy'].forEach(id => document.getElementById(id).innerText = 'N/A'); return; }
+            const wins = trades.filter(t => t.outcome === 'Win').length; const losses = total - wins;
+            document.getElementById('winRate').innerText = (wins / total * 100).toFixed(1) + '%';
+            document.getElementById('avgRR').innerText = (trades.reduce((s, t) => s + parseFloat(t.rr || 0), 0) / total).toFixed(2);
+            const avgWin = trades.filter(t => t.outcome === 'Win').reduce((s, t) => s + t.pl, 0) / (wins || 1);
+            const avgLoss = Math.abs(trades.filter(t => t.outcome === 'Loss').reduce((s, t) => s + t.pl, 0) / (losses || 1));
+            document.getElementById('expectancy').innerText = `$${((wins/total * avgWin) - (losses/total * avgLoss)).toFixed(2)} per trade`;
+        }
+
+        // --- Generic Gemini API Caller ---
+        async function callGemini(prompt, jsonSchema = null) {
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            if (jsonSchema) { payload.generationConfig = { responseMimeType: "application/json", responseSchema: jsonSchema }; }
+            const apiKey = ""; // Managed by environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+            const result = await response.json();
+            if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) { return result.candidates[0].content.parts[0].text; }
+            else { throw new Error("Invalid response structure from API."); }
+        }
+        
+        function loadApiKeyFromStorage() {
+            const savedKey = localStorage.getItem('fmpApiKey');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+            }
+        }
+
+        // --- Initial Load ---
+        window.onload = function() {
+            chart = new ApexCharts(document.querySelector("#chart"), chartOptions);
+            chart.render();
+            loadApiKeyFromStorage();
+            loadTradesFromStorage();
+            populateTradeLogUI();
+            updateDashboardMetrics();
+            renderAssetCurveChart();
+            loadChartData(); // Load default chart on start
+        };
+
+    </script>
+</body>
+</html>

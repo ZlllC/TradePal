@@ -73,12 +73,21 @@
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-white">Trading Companion</h1>
             <p class="text-gray-400">Your personal dashboard for disciplined trading, now with live data & AI analysis.</p>
-            <div class="mt-4 trading-card p-4 rounded-lg">
-                <label for="apiKeyInput" class="block text-sm font-medium text-gray-300">FinancialModelingPrep API Key</label>
-                <div class="flex items-center space-x-2 mt-1">
-                    <input type="password" id="apiKeyInput" class="bg-gray-800 border-gray-600 rounded-md shadow-sm p-2 text-sm w-full max-w-xs" placeholder="Enter your API Key">
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="trading-card p-4 rounded-lg">
+                    <label for="fmpApiKeyInput" class="block text-sm font-medium text-gray-300">FinancialModelingPrep API Key</label>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="password" id="fmpApiKeyInput" class="bg-gray-800 border-gray-600 rounded-md shadow-sm p-2 text-sm w-full" placeholder="Enter FMP Key for Chart Data">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Get a free key from <a href="https://site.financialmodelingprep.com/developer" target="_blank" class="text-blue-400 hover:underline">FinancialModelingPrep</a>.</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Required for live data. Get a free key from <a href="https://site.financialmodelingprep.com/developer" target="_blank" class="text-blue-400 hover:underline">FinancialModelingPrep</a>.</p>
+                 <div class="trading-card p-4 rounded-lg">
+                    <label for="geminiApiKeyInput" class="block text-sm font-medium text-gray-300">Google Gemini API Key</label>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="password" id="geminiApiKeyInput" class="bg-gray-800 border-gray-600 rounded-md shadow-sm p-2 text-sm w-full" placeholder="Enter Gemini Key for AI Features">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-400 hover:underline">Google AI Studio</a>.</p>
+                </div>
             </div>
         </header>
 
@@ -110,7 +119,7 @@
                             </div>
                         </div>
                         <div id="chart"></div>
-                         <div id="chartMessage" class="text-center text-gray-400 py-4">Enter a Forex pair (e.g., EURUSD) or Index (e.g., ^GSPC) and click "Load Chart".</div>
+                         <div id="chartMessage" class="text-center text-gray-400 py-4">Enter API Keys above, then load a chart.</div>
                     </div>
 
                     <!-- Right side: AI Analysis and Trade Plan -->
@@ -268,10 +277,10 @@
         };
 
         async function fetchFinancialData() {
-            const FMP_API_KEY = document.getElementById('apiKeyInput').value;
+            const FMP_API_KEY = document.getElementById('fmpApiKeyInput').value;
             if (!FMP_API_KEY) {
                 document.getElementById('chartMessage').classList.remove('hidden');
-                document.getElementById('chartMessage').innerText = 'Please enter your FinancialModelingPrep API Key above to load chart data.';
+                document.getElementById('chartMessage').innerText = 'Please enter your FinancialModelingPrep API Key above.';
                 return;
             }
             
@@ -383,7 +392,7 @@
 
             } catch (error) {
                 console.error("Error generating analysis:", error);
-                analysisResultDiv.innerText = 'Failed to generate analysis. Please try again.';
+                analysisResultDiv.innerText = `AI Error: ${error.message}`;
             } finally {
                 spinner.classList.add('hidden');
                 generateBtn.disabled = false;
@@ -411,10 +420,11 @@
 
                 planResultDiv.innerHTML = `<strong>Direction:</strong> ${latestPlan.direction}<br><strong>Entry:</strong> ${latestPlan.entry.toFixed(4)}<br><strong>Stop-Loss:</strong> ${latestPlan.stop_loss.toFixed(4)}<br><strong>Take-Profit:</strong> ${latestPlan.take_profit.toFixed(4)}<br><strong>Reasoning:</strong> ${latestPlan.reasoning}`;
                 applyBtn.classList.remove('hidden');
+                localStorage.setItem('geminiApiKey', document.getElementById('geminiApiKeyInput').value);
 
             } catch (error) {
                 console.error("Error drafting plan:", error);
-                planResultDiv.innerText = 'Failed to draft a trade plan. Please try again.';
+                planResultDiv.innerText = `AI Error: ${error.message}`;
             } finally {
                 spinner.classList.add('hidden');
                 draftBtn.disabled = false;
@@ -440,7 +450,7 @@
             const savedTrades = localStorage.getItem('tradingCompanionLog');
             if (savedTrades) {
                 trades = JSON.parse(savedTrades).map(trade => {
-                    trade.date = new Date(trade.date); // Convert date string back to Date object
+                    trade.date = new Date(trade.date);
                     return trade;
                 });
             }
@@ -495,7 +505,7 @@
                 resultDiv.innerHTML = reflectionText.replace(/\n/g, '<br>');
             } catch (error) {
                 console.error("Error generating reflection:", error);
-                resultDiv.innerText = 'Failed to generate reflection. Please try again.';
+                resultDiv.innerText = `AI Error: ${error.message}`;
             } finally { spinner.classList.add('hidden'); }
         }
         
@@ -520,21 +530,39 @@
 
         // --- Generic Gemini API Caller ---
         async function callGemini(prompt, jsonSchema = null) {
+            const apiKey = document.getElementById('geminiApiKeyInput').value;
+            if (!apiKey) {
+                throw new Error("Please enter your Google Gemini API Key above.");
+            }
+            
             const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
             if (jsonSchema) { payload.generationConfig = { responseMimeType: "application/json", responseSchema: jsonSchema }; }
-            const apiKey = ""; // Managed by environment
+            
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+            
+            if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.error.message || `API call failed: ${response.status}`);
+            }
+
             const result = await response.json();
-            if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) { return result.candidates[0].content.parts[0].text; }
-            else { throw new Error("Invalid response structure from API."); }
+            if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
+                localStorage.setItem('geminiApiKey', apiKey); // Save on success
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error("Invalid response structure from API.");
+            }
         }
         
-        function loadApiKeyFromStorage() {
-            const savedKey = localStorage.getItem('fmpApiKey');
-            if (savedKey) {
-                document.getElementById('apiKeyInput').value = savedKey;
+        function loadApiKeysFromStorage() {
+            const fmpKey = localStorage.getItem('fmpApiKey');
+            if (fmpKey) {
+                document.getElementById('fmpApiKeyInput').value = fmpKey;
+            }
+            const geminiKey = localStorage.getItem('geminiApiKey');
+            if (geminiKey) {
+                document.getElementById('geminiApiKeyInput').value = geminiKey;
             }
         }
 
@@ -542,12 +570,12 @@
         window.onload = function() {
             chart = new ApexCharts(document.querySelector("#chart"), chartOptions);
             chart.render();
-            loadApiKeyFromStorage();
+            loadApiKeysFromStorage();
             loadTradesFromStorage();
             populateTradeLogUI();
             updateDashboardMetrics();
             renderAssetCurveChart();
-            loadChartData(); // Load default chart on start
+            loadChartData();
         };
 
     </script>
